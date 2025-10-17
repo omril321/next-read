@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Next Read - Find Your Next Book</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 16px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      background: #fee;
+      border: 1px solid #fcc;
+      color: #c33;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .book-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .book-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .book-author {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .editions {
+      margin-bottom: 12px;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+
+    .edition-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .edition-title {
+      font-size: 14px;
+      color: #333;
+    }
+
+    .edition-section {
+      margin-bottom: 8px;
+    }
+
+    .edition-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .libby-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .libby-link {
+      flex: 1;
+      min-width: 140px;
+      padding: 12px 16px;
+      background: #007bff;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .libby-link:hover {
+      background: #0056b3;
+    }
+
+    .libby-link.hebrew {
+      background: #28a745;
+    }
+
+    .libby-link.hebrew:hover {
+      background: #1e7e34;
+    }
+
+    .libby-link:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .book-count {
+      text-align: center;
+      color: #666;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    .refresh-btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+
+    .refresh-btn:hover {
+      background: #5a6268;
+    }
+
+    @media (max-width: 600px) {
+      .libby-links {
+        flex-direction: column;
+      }
+
+      .libby-link {
+        min-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📚 Next Read</h1>
+      <p class="subtitle">Find your next book from Storygraph on Libby</p>
+    </header>
+
+    <button class="refresh-btn" onclick="loadBooks()">🔄 Refresh Books</button>
+
+    <div id="content">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Loading your to-read pile...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadBooks() {
+      const content = document.getElementById('content');
+      content.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Loading your to-read pile...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/books');
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load books');
+        }
+
+        if (data.books.length === 0) {
+          content.innerHTML = `
+            <div class="error">
+              No books found in your to-read pile.
+            </div>
+          `;
+          return;
+        }
+
+        let html = `<div class="book-count">${data.count} books in your to-read pile</div>`;
+
+        data.books.forEach(book => {
+          const hebrewTitle = book.editions?.hebrewTitle;
+          const englishTitle = book.editions?.englishTitle || book.title;
+
+          html += `
+            <div class="book-card">
+              <div class="book-title">${escapeHtml(book.title)}</div>
+              <div class="book-author">${escapeHtml(book.author)}</div>
+
+              ${hebrewTitle || englishTitle !== book.title ? `
+                <div class="editions">
+                  ${englishTitle !== book.title ? `
+                    <div class="edition-section">
+                      <div class="edition-label">English Edition</div>
+                      <div class="edition-title">${escapeHtml(englishTitle)}</div>
+                    </div>
+                  ` : ''}
+                  ${hebrewTitle ? `
+                    <div class="edition-section">
+                      <div class="edition-label">Hebrew Edition</div>
+                      <div class="edition-title">${escapeHtml(hebrewTitle)}</div>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+
+              <div class="libby-links">
+                <a href="${book.libbyLinks.english}" target="_blank" class="libby-link">
+                  Search on Libby (EN)
+                </a>
+                ${book.libbyLinks.hebrew ? `
+                  <a href="${book.libbyLinks.hebrew}" target="_blank" class="libby-link hebrew">
+                    Search on Libby (HE)
+                  </a>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        });
+
+        content.innerHTML = html;
+
+      } catch (error) {
+        content.innerHTML = `
+          <div class="error">
+            <strong>Error:</strong> ${escapeHtml(error.message)}
+          </div>
+        `;
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Load books on page load
+    loadBooks();
+  </script>
+</body>
+</html>

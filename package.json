@@ -1,0 +1,25 @@
+{
+  "name": "next-read",
+  "version": "1.0.0",
+  "description": "Find your next book to read from Storygraph on Libby",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "packageManager": "yarn@1.22.22",
+  "keywords": [
+    "books",
+    "libby",
+    "storygraph"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "express": "^5.0.1",
+    "playwright": "^1.56.1"
+  }
+}
