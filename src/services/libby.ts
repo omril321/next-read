@@ -25,8 +25,8 @@ export class LibbyService {
     // Encode the title for URL
     const encodedTitle = encodeURIComponent(title);
 
-    // Generate Libby search URL
-    return `https://libbyapp.com/search/${this.libraryId}/search/query-${encodedTitle}`;
+    // Generate Libby search URL with scope-auto and page-1
+    return `https://libbyapp.com/search/${this.libraryId}/search/scope-auto/query-${encodedTitle}/page-1`;
   }
 
   /**

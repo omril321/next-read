@@ -3,14 +3,19 @@
  *
  * Uses Playwright for authenticated scraping since Storygraph has no official API.
  * Filters duplicate books by tracking unique book URLs.
+ * Uses cookie persistence to maintain login sessions and run in headless mode.
  */
 
 import { chromium } from 'playwright';
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import type { Book } from '../types/index.js';
 
 export class StorygraphService {
   private readonly email: string;
   private readonly password: string;
+  private readonly cookiesPath: string;
 
   constructor() {
     const email = process.env.STORYGRAPH_EMAIL;
@@ -24,6 +29,32 @@ export class StorygraphService {
 
     this.email = email;
     this.password = password;
+    this.cookiesPath = join(process.cwd(), '.cache', 'storygraph-cookies.json');
+  }
+
+  private async loadCookies(): Promise<unknown[] | null> {
+    try {
+      if (existsSync(this.cookiesPath)) {
+        const cookiesJson = await readFile(this.cookiesPath, 'utf-8');
+        return JSON.parse(cookiesJson) as unknown[];
+      }
+    } catch (error) {
+      console.log('No existing cookies found or error loading:', error);
+    }
+    return null;
+  }
+
+  private async saveCookies(cookies: unknown[]): Promise<void> {
+    try {
+      const cacheDir = join(process.cwd(), '.cache');
+      if (!existsSync(cacheDir)) {
+        await mkdir(cacheDir, { recursive: true });
+      }
+      await writeFile(this.cookiesPath, JSON.stringify(cookies, null, 2));
+      console.log('Cookies saved for future sessions');
+    } catch (error) {
+      console.log('Error saving cookies:', error);
+    }
   }
 
   /**
@@ -31,80 +62,136 @@ export class StorygraphService {
    * @returns Array of books with title, author, and Storygraph URL
    */
   async getToReadPile(): Promise<Book[]> {
+    // Try to load saved cookies
+    const savedCookies = await this.loadCookies();
+
+    // Always try headless mode with stealth settings
     const browser = await chromium.launch({
       headless: true,
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+      ],
     });
 
     try {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-
-      // Login to Storygraph
-      console.log('Navigating to Storygraph login...');
-      await page.goto('https://app.thestorygraph.com/users/sign_in', {
-        waitUntil: 'networkidle',
+      // Configure context to look like a real browser
+      const context = await browser.newContext({
+        userAgent:
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        viewport: { width: 1920, height: 1080 },
+        locale: 'en-US',
+        timezoneId: 'America/New_York',
       });
 
-      // Fill in login form
-      console.log('Logging in...');
-      await page.fill('input[name="user[email]"]', this.email);
-      await page.fill('input[name="user[password]"]', this.password);
-
-      // Take screenshot before clicking submit
-      await page.screenshot({ path: 'before-login.png' });
-      console.log('Screenshot before login saved to before-login.png');
-
-      // Click login and wait for navigation
-      await page.click('button[type="submit"]');
-      await page.waitForLoadState('networkidle');
-
-      // Check if login was successful
-      const currentUrl = page.url();
-      console.log(`After login - Current URL: ${currentUrl}`);
-
-      // Take screenshot after login
-      await page.screenshot({ path: 'after-login.png' });
-      console.log('Screenshot after login saved to after-login.png');
-
-      // If we're still on the sign-in page, login failed
-      if (currentUrl.includes('/users/sign_in')) {
-        // Check for error messages
-        const errorMessage = await page.evaluate(() => {
-          const alert = document.querySelector(
-            '.alert, .error, [role="alert"]'
-          );
-          return alert
-            ? (alert.textContent?.trim() ?? 'Unknown error')
-            : 'Unknown error';
-        });
-        throw new Error(
-          `Login failed: ${errorMessage}. Please check your credentials.`
-        );
+      // Load cookies if available
+      if (savedCookies) {
+        console.log('Loading saved cookies...');
+        await context.addCookies(savedCookies as never[]);
       }
 
-      console.log('Login successful!');
+      const page = await context.newPage();
 
-      // Navigate to to-read pile
-      console.log('Fetching to-read pile...');
-      const username = this.email.split('@')[0]; // Extract username from email
-      const toReadUrl = `https://app.thestorygraph.com/to-read/${username}`;
-      console.log(`Navigating to: ${toReadUrl}`);
-      await page.goto(toReadUrl, {
-        waitUntil: 'networkidle',
+      // Add stealth scripts to avoid detection
+      await page.addInitScript(() => {
+        // Override the navigator.webdriver property
+        // eslint-disable-next-line no-undef
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => undefined,
+        });
       });
 
-      // Log the current URL and page title
-      console.log(`Current URL: ${page.url()}`);
-      console.log(`Page title: ${await page.title()}`);
+      // Navigate to login page
+      await page.goto('https://app.thestorygraph.com/users/sign_in', {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      });
 
-      // Take a screenshot for debugging
-      await page.screenshot({ path: 'to-read-page.png' });
-      console.log('Screenshot saved to to-read-page.png');
+      await page.waitForTimeout(2000);
+
+      // Check for Cloudflare challenge
+      const hasCaptcha = await page.evaluate(() => {
+        return (
+          (document.body.textContent?.includes('Verify you are human') ??
+            false) ||
+          document.querySelector('[name="cf-turnstile-response"]') !== null
+        );
+      });
+
+      if (hasCaptcha) {
+        console.log(
+          'Cloudflare challenge detected. Waiting for it to resolve...'
+        );
+        await page.waitForFunction(
+          () => {
+            return (
+              document.querySelector('input[name="user[email]"]') !== null ||
+              !document.body.textContent?.includes('Verify you are human')
+            );
+          },
+          { timeout: 60000 }
+        );
+        await page.waitForTimeout(2000);
+      }
+
+      // Check if already logged in
+      const alreadyLoggedIn = await page.evaluate(() => {
+        return (
+          document.body.textContent?.includes('already signed in') ?? false
+        );
+      });
+
+      if (!alreadyLoggedIn) {
+        // Wait for and fill login form
+        await page.waitForSelector('input[name="user[email]"]', {
+          timeout: 15000,
+        });
+        await page.fill('input[name="user[email]"]', this.email);
+        await page.fill('input[name="user[password]"]', this.password);
+
+        // Submit and wait for navigation
+        await page.click('button[type="submit"]');
+        await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+        await page.waitForTimeout(2000);
+
+        // Verify login success
+        const currentUrl = page.url();
+        if (currentUrl.includes('/users/sign_in')) {
+          const errorMessage = await page.evaluate(() => {
+            const alert = document.querySelector(
+              '.alert, .error, [role="alert"]'
+            );
+            return alert
+              ? (alert.textContent?.trim() ?? 'Unknown error')
+              : 'Unknown error';
+          });
+          throw new Error(
+            `Login failed: ${errorMessage}. Please check your credentials.`
+          );
+        }
+
+        // Save cookies for future sessions
+        const cookies = await context.cookies();
+        await this.saveCookies(cookies);
+      }
+
+      // Navigate to to-read pile
+      const username = this.email.split('@')[0];
+      const toReadUrl = `https://app.thestorygraph.com/to-read/${username}`;
+      await page.goto(toReadUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      });
+
+      // Wait for book content to load
+      await page.waitForSelector('h3', { timeout: 10000 });
 
       // Extract book data from the page
       const books = await page.evaluate(() => {
         const bookElements = document.querySelectorAll('h3');
-        console.log(`Found ${bookElements.length} h3 elements`);
 
         const results: Array<{ title: string; author: string; url: string }> =
           [];
