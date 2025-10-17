@@ -62,8 +62,23 @@ export interface HealthResponse {
 }
 
 /**
+ * Industry identifier types from Google Books API
+ * @see https://developers.google.com/books/docs/v1/reference/volumes
+ */
+export type IndustryIdentifierType = 'ISBN_10' | 'ISBN_13' | 'ISSN' | 'OTHER';
+
+/**
+ * Industry identifier structure
+ */
+export interface IndustryIdentifier {
+  type: IndustryIdentifierType;
+  identifier: string;
+}
+
+/**
  * Google Books API volume info structure
  * Based on Google Books API v1 specification
+ * @see https://developers.google.com/books/docs/v1/reference/volumes
  */
 export interface GoogleBooksVolumeInfo {
   title: string;
@@ -71,10 +86,7 @@ export interface GoogleBooksVolumeInfo {
   publisher?: string;
   publishedDate?: string;
   description?: string;
-  industryIdentifiers?: Array<{
-    type: 'ISBN_10' | 'ISBN_13' | 'ISSN' | 'OTHER';
-    identifier: string;
-  }>;
+  industryIdentifiers?: IndustryIdentifier[];
   pageCount?: number;
   printType?: string;
   categories?: string[];
@@ -88,6 +100,7 @@ export interface GoogleBooksVolumeInfo {
 
 /**
  * Google Books API volume item
+ * @see https://developers.google.com/books/docs/v1/reference/volumes
  */
 export interface GoogleBooksItem {
   kind: string;
@@ -99,6 +112,7 @@ export interface GoogleBooksItem {
 
 /**
  * Google Books API response
+ * @see https://developers.google.com/books/docs/v1/reference/volumes/list
  */
 export interface GoogleBooksResponse {
   kind: string;

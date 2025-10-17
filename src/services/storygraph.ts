@@ -55,10 +55,8 @@ export class StorygraphService {
       console.log('Screenshot before login saved to before-login.png');
 
       // Click login and wait for navigation
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle' }),
-        page.click('button[type="submit"]'),
-      ]);
+      await page.click('button[type="submit"]');
+      await page.waitForLoadState('networkidle');
 
       // Check if login was successful
       const currentUrl = page.url();
@@ -72,9 +70,12 @@ export class StorygraphService {
       if (currentUrl.includes('/users/sign_in')) {
         // Check for error messages
         const errorMessage = await page.evaluate(() => {
-          // @ts-ignore - runs in browser context where document exists
-          const alert = document.querySelector('.alert, .error, [role="alert"]');
-          return alert ? alert.textContent?.trim() ?? 'Unknown error' : 'Unknown error';
+          const alert = document.querySelector(
+            '.alert, .error, [role="alert"]'
+          );
+          return alert
+            ? (alert.textContent?.trim() ?? 'Unknown error')
+            : 'Unknown error';
         });
         throw new Error(
           `Login failed: ${errorMessage}. Please check your credentials.`
@@ -102,25 +103,20 @@ export class StorygraphService {
 
       // Extract book data from the page
       const books = await page.evaluate(() => {
-        // @ts-ignore - runs in browser context where document exists
         const bookElements = document.querySelectorAll('h3');
         console.log(`Found ${bookElements.length} h3 elements`);
 
-        const results: Array<{ title: string; author: string; url: string }> = [];
-        // @ts-ignore - Set is available in browser context
-        const seen = new Set<string>(); // Track unique book URLs to avoid duplicates
+        const results: Array<{ title: string; author: string; url: string }> =
+          [];
+        const seen = new Set<string>();
 
-        // @ts-ignore - forEach is valid on NodeList
         bookElements.forEach((heading) => {
-          // Extract title and author from heading structure
           const titleLink = heading.querySelector('a');
           if (!titleLink) {
             return;
           }
 
           const url = titleLink.getAttribute('href');
-
-          // Skip if not a book URL or already seen
           if (!url || !url.startsWith('/books/') || seen.has(url)) {
             return;
           }
@@ -129,7 +125,9 @@ export class StorygraphService {
 
           const title = titleLink.textContent?.trim() ?? '';
           const authorParagraph = heading.querySelector('p');
-          const author = authorParagraph ? authorParagraph.textContent?.trim() ?? '' : '';
+          const author = authorParagraph
+            ? (authorParagraph.textContent?.trim() ?? '')
+            : '';
 
           results.push({
             title,

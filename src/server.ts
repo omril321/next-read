@@ -41,65 +41,75 @@ app.use(express.static(path.join(__dirname, 'public')));
 /**
  * Main API endpoint - Fetch and enrich all to-read books
  */
-app.get('/api/books', async (_req: Request, res: Response<BooksApiResponse | ErrorApiResponse>) => {
-  try {
-    console.log('Fetching to-read books from Storygraph...');
-    const toReadBooks = await storygraph.getToReadPile();
-    console.log(`Found ${toReadBooks.length} books`);
+app.get(
+  '/api/books',
+  async (_req: Request, res: Response<BooksApiResponse | ErrorApiResponse>) => {
+    try {
+      console.log('Fetching to-read books from Storygraph...');
+      const toReadBooks = await storygraph.getToReadPile();
+      console.log(`Found ${toReadBooks.length} books`);
 
-    console.log('Enriching book data with Google Books and Libby links...');
-    const enrichedBooks: EnrichedBook[] = await Promise.all(
-      toReadBooks.map(async (book) => {
-        try {
-          // Get Hebrew and English editions
-          const editions = await googleBooks.findEditions(
-            book.title,
-            book.author
-          );
+      console.log('Enriching book data with Google Books and Libby links...');
+      const enrichedBooks: EnrichedBook[] = await Promise.all(
+        toReadBooks.map(async (book) => {
+          try {
+            // Get Hebrew and English editions
+            const editions = await googleBooks.findEditions(
+              book.title,
+              book.author
+            );
 
-          // Generate Libby search URLs for both languages
-          const libbyLinks = {
-            english: libby.getSearchUrl(editions.englishTitle ?? book.title),
-            hebrew: libby.getSearchUrl(editions.hebrewTitle ?? book.title),
-          };
+            // Generate Libby search URLs for both languages
+            const libbyLinks = {
+              english: libby.getSearchUrl(editions.englishTitle ?? book.title),
+              hebrew: libby.getSearchUrl(editions.hebrewTitle ?? book.title),
+            };
 
-          return {
-            ...book,
-            editions,
-            libbyLinks,
-          };
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error';
-          console.error(`Error processing book "${book.title}":`, errorMessage);
-          return {
-            ...book,
-            editions: { englishTitle: book.title, hebrewTitle: null, isbns: [] },
-            libbyLinks: {
-              english: libby.getSearchUrl(book.title),
-              hebrew: null,
-            },
-            error: errorMessage,
-          };
-        }
-      })
-    );
+            return {
+              ...book,
+              editions,
+              libbyLinks,
+            };
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : 'Unknown error';
+            console.error(
+              `Error processing book "${book.title}":`,
+              errorMessage
+            );
+            return {
+              ...book,
+              editions: {
+                englishTitle: book.title,
+                hebrewTitle: null,
+                isbns: [],
+              },
+              libbyLinks: {
+                english: libby.getSearchUrl(book.title),
+                hebrew: null,
+              },
+              error: errorMessage,
+            };
+          }
+        })
+      );
 
-    res.json({
-      success: true,
-      count: enrichedBooks.length,
-      books: enrichedBooks,
-    });
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error fetching books:', error);
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-    });
+      res.json({
+        success: true,
+        count: enrichedBooks.length,
+        books: enrichedBooks,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error fetching books:', error);
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
+    }
   }
-});
+);
 
 /**
  * Health check endpoint

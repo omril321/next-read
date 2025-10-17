@@ -19,6 +19,7 @@ Web app (mobile-optimized) that:
 
 ## Tech Stack
 - **Runtime**: Node.js 24 (via nvm)
+- **Package Manager**: yarn
 - **Backend**: Express.js
 - **Scraping**: Puppeteer (for Storygraph authentication)
 - **Book Data**: Google Books API (for title translations/editions)

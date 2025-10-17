@@ -1,0 +1,16 @@
+# Build output
+dist/
+*.js
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Screenshots (debug files)
+*.png
