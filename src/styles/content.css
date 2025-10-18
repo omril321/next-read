@@ -1,0 +1,87 @@
+/* Next Read - Chrome Extension Styles */
+
+/* Container for book metadata */
+.nextread-metadata {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #d1d5db;
+}
+
+/* Rating display */
+.nextread-rating {
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.nextread-rating-star {
+  font-size: 14px;
+  margin-right: 3px;
+}
+
+.nextread-rating-value {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.nextread-rating-count {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+/* Genre/category display */
+.nextread-genres {
+  display: inline-block;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.nextread-genre-separator {
+  margin: 0 6px;
+  color: #6b7280;
+}
+
+/* Loading spinner */
+.nextread-loading {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: nextread-spin 0.8s linear infinite;
+}
+
+@keyframes nextread-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error state */
+.nextread-error {
+  color: #dc2626;
+  font-size: 11px;
+}
+
+/* Loading indicator on cards */
+a[data-nextread-loading] {
+  opacity: 0.8;
+}
+
+/* Review links */
+.nextread-links {
+  margin-left: 6px;
+}
+
+.nextread-link {
+  text-decoration: none;
+  font-size: 14px;
+  margin: 0 2px;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.nextread-link:hover {
+  opacity: 1;
+}

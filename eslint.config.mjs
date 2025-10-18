@@ -28,6 +28,11 @@ export default [
         document: 'readonly',
         Element: 'readonly',
         HTMLElement: 'readonly',
+        window: 'readonly',
+        chrome: 'readonly',
+        fetch: 'readonly',
+        DOMParser: 'readonly',
+        MutationObserver: 'readonly',
       },
     },
     plugins: {

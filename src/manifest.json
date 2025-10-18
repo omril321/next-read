@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Next Read - Libby Book Enhancer",
+  "version": "1.0.0",
+  "description": "Enhance Libby with book ratings, review counts, and genres from Goodreads",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://libbyapp.com/*",
+    "https://*.overdrive.com/*",
+    "https://*.goodreads.com/*"
+  ],
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://libbyapp.com/*", "https://*.overdrive.com/*"],
+      "js": ["content/content.js"],
+      "css": ["styles/content.css"],
+      "run_at": "document_end"
+    }
+  ]
+}
