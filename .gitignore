@@ -6,8 +6,5 @@ node_modules/
 # TypeScript build output
 dist/
 
-# Playwright screenshots
-*.png
-
 # Cache directory (cookies, etc.)
 .cache/

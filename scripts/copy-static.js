@@ -24,6 +24,18 @@ const filesToCopy = [
     src: join(srcDir, 'styles', 'content.css'),
     dest: join(distDir, 'styles', 'content.css'),
   },
+  {
+    src: join(rootDir, 'icons', 'icon-16.png'),
+    dest: join(distDir, 'icons', 'icon-16.png'),
+  },
+  {
+    src: join(rootDir, 'icons', 'icon-48.png'),
+    dest: join(distDir, 'icons', 'icon-48.png'),
+  },
+  {
+    src: join(rootDir, 'icons', 'icon-128.png'),
+    dest: join(distDir, 'icons', 'icon-128.png'),
+  },
 ];
 
 // Ensure subdirectories exist and copy files

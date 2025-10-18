@@ -1,0 +1,28 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#4A90E2"/>
+
+  <!-- Book shape -->
+  <g transform="translate(32, 28)">
+    <!-- Book pages -->
+    <rect x="0" y="0" width="48" height="64" rx="4" fill="#FFFFFF"/>
+
+    <!-- Book spine shadow -->
+    <rect x="22" y="0" width="4" height="64" fill="#E0E0E0"/>
+
+    <!-- Book lines (text representation) -->
+    <line x1="8" y1="16" x2="40" y2="16" stroke="#CCCCCC" stroke-width="2"/>
+    <line x1="8" y1="24" x2="40" y2="24" stroke="#CCCCCC" stroke-width="2"/>
+    <line x1="8" y1="32" x2="40" y2="32" stroke="#CCCCCC" stroke-width="2"/>
+  </g>
+
+  <!-- Star badge (representing ratings) -->
+  <g transform="translate(78, 78)">
+    <!-- Star background circle -->
+    <circle cx="12" cy="12" r="16" fill="#FFD700" stroke="#FFA500" stroke-width="2"/>
+
+    <!-- Star shape -->
+    <path d="M 12 4 L 14.5 10 L 21 10.5 L 16 15 L 17.5 21 L 12 17.5 L 6.5 21 L 8 15 L 3 10.5 L 9.5 10 Z"
+          fill="#FFFFFF"/>
+  </g>
+</svg>
