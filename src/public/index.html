@@ -71,88 +71,145 @@
 
     .book-card {
       background: white;
-      border-radius: 12px;
-      padding: 16px;
+      border-radius: 8px;
+      padding: 20px;
       margin-bottom: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border-left: 4px solid #ddd;
+    }
+
+    .book-card.available {
+      border-left-color: #28a745;
+    }
+
+    .book-header {
+      margin-bottom: 12px;
     }
 
     .book-title {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 600;
-      color: #333;
-      margin-bottom: 4px;
+      color: #0066cc;
+      margin-bottom: 6px;
+      text-decoration: none;
+      display: inline;
+      line-height: 1.4;
+    }
+
+    .book-title:hover {
+      text-decoration: underline;
+    }
+
+    .book-meta {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 12px;
+      line-height: 1.6;
     }
 
     .book-author {
-      color: #666;
-      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .book-series {
+      color: #888;
+      font-style: italic;
+    }
+
+    .book-stats {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
       margin-bottom: 12px;
     }
 
-    .editions {
-      margin-bottom: 12px;
-      padding: 12px;
-      background: #f9f9f9;
-      border-radius: 8px;
-    }
-
-    .edition-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #666;
-      text-transform: uppercase;
-      margin-bottom: 4px;
-    }
-
-    .edition-title {
+    .rating {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-size: 14px;
       color: #333;
     }
 
-    .edition-section {
-      margin-bottom: 8px;
+    .rating-stars {
+      color: #ffa500;
+      font-size: 16px;
     }
 
-    .edition-section:last-child {
-      margin-bottom: 0;
+    .rating-count {
+      color: #888;
+      font-size: 13px;
     }
 
-    .libby-links {
+    .genres {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .genre-tag {
+      background: #f0f0f0;
+      color: #555;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .availability-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .availability-badge.available {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .availability-badge.unavailable {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .availability-badge.unknown {
+      background: #e2e3e5;
+      color: #383d41;
+    }
+
+    .book-links {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
     }
 
-    .libby-link {
-      flex: 1;
-      min-width: 140px;
-      padding: 12px 16px;
-      background: #007bff;
+    .book-link {
+      padding: 8px 14px;
+      background: #0066cc;
       color: white;
       text-decoration: none;
-      border-radius: 8px;
-      text-align: center;
+      border-radius: 6px;
+      font-size: 13px;
       font-weight: 500;
-      font-size: 14px;
       transition: background 0.2s;
     }
 
-    .libby-link:hover {
-      background: #0056b3;
+    .book-link:hover {
+      background: #0052a3;
     }
 
-    .libby-link.hebrew {
-      background: #28a745;
+    .book-link.secondary {
+      background: #6c757d;
     }
 
-    .libby-link.hebrew:hover {
-      background: #1e7e34;
-    }
-
-    .libby-link:disabled {
-      background: #ccc;
-      cursor: not-allowed;
+    .book-link.secondary:hover {
+      background: #5a6268;
     }
 
     .book-count {
@@ -160,6 +217,12 @@
       color: #666;
       margin-bottom: 16px;
       font-size: 14px;
+    }
+
+    .enrichment-status {
+      color: #999;
+      font-size: 12px;
+      font-style: italic;
     }
 
     .refresh-btn {
@@ -219,7 +282,9 @@
       `;
 
       try {
-        const response = await fetch('/api/books');
+        // Layer 1: Load basic books from Storygraph (fast)
+        console.log('Loading basic books...');
+        const response = await fetch('/api/books/basic');
         const data = await response.json();
 
         if (!data.success) {
@@ -235,49 +300,45 @@
           return;
         }
 
-        let html = `<div class="book-count">${data.count} books in your to-read pile</div>`;
+        // Display basic books immediately
+        let html = `<div class="book-count">${data.count} books in your to-read pile <span class="enrichment-status">(Loading details...)</span></div>`;
+        content.innerHTML = html;
 
-        data.books.forEach(book => {
-          const hebrewTitle = book.editions?.hebrewTitle;
-          const englishTitle = book.editions?.englishTitle || book.title;
+        // Create book cards container
+        const booksContainer = document.createElement('div');
+        content.appendChild(booksContainer);
 
-          html += `
-            <div class="book-card">
-              <div class="book-title">${escapeHtml(book.title)}</div>
-              <div class="book-author">${escapeHtml(book.author)}</div>
-
-              ${hebrewTitle || englishTitle !== book.title ? `
-                <div class="editions">
-                  ${englishTitle !== book.title ? `
-                    <div class="edition-section">
-                      <div class="edition-label">English Edition</div>
-                      <div class="edition-title">${escapeHtml(englishTitle)}</div>
-                    </div>
-                  ` : ''}
-                  ${hebrewTitle ? `
-                    <div class="edition-section">
-                      <div class="edition-label">Hebrew Edition</div>
-                      <div class="edition-title">${escapeHtml(hebrewTitle)}</div>
-                    </div>
-                  ` : ''}
-                </div>
-              ` : ''}
-
-              <div class="libby-links">
-                <a href="${book.libbyLinks.english}" target="_blank" class="libby-link">
-                  Search on Libby (EN)
-                </a>
-                ${book.libbyLinks.hebrew ? `
-                  <a href="${book.libbyLinks.hebrew}" target="_blank" class="libby-link hebrew">
-                    Search on Libby (HE)
-                  </a>
-                ` : ''}
-              </div>
-            </div>
-          `;
+        // Render basic book cards
+        data.books.forEach((book, index) => {
+          const bookCard = createBookCard(book, index, true);
+          booksContainer.appendChild(bookCard);
         });
 
-        content.innerHTML = html;
+        // Layer 2 & 3: Progressively enrich each book
+        console.log('Starting progressive enrichment...');
+        for (let index = 0; index < data.books.length; index++) {
+          try {
+            const enrichResponse = await fetch(`/api/books/${index}/enrich`);
+            const enrichData = await enrichResponse.json();
+
+            if (enrichData.success && enrichData.book) {
+              // Update the book card with enriched data
+              const bookCard = document.getElementById(`book-card-${index}`);
+              if (bookCard) {
+                const newCard = createBookCard(enrichData.book, index, false);
+                bookCard.replaceWith(newCard);
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to enrich book ${index}:`, error);
+          }
+        }
+
+        // Update status message
+        const statusEl = document.querySelector('.enrichment-status');
+        if (statusEl) {
+          statusEl.textContent = '(All details loaded)';
+        }
 
       } catch (error) {
         content.innerHTML = `
@@ -286,6 +347,115 @@
           </div>
         `;
       }
+    }
+
+    function createBookCard(book, index, isLoading) {
+      const div = document.createElement('div');
+      div.id = `book-card-${index}`;
+      div.className = `book-card ${book.libbyAvailability?.isAvailable ? 'available' : ''}`;
+
+      if (isLoading) {
+        // Basic card while enriching
+        div.innerHTML = `
+          <div class="book-header">
+            <a href="${book.storygraphUrl}" target="_blank" class="book-title">
+              ${escapeHtml(book.title)}
+            </a>
+          </div>
+          <div class="book-meta">
+            <span class="book-author">by ${escapeHtml(book.author)}</span>
+          </div>
+          <div class="loading" style="padding: 10px 0;">
+            <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+            <p style="font-size: 12px; color: #888;">Loading details...</p>
+          </div>
+        `;
+      } else {
+        // Full enriched card
+        // Prioritize Hebrew title, fallback to English, then original
+        const displayTitle = book.editions?.hebrewTitle || book.editions?.englishTitle || book.title;
+
+        // Prioritize Hebrew author, fallback to original
+        const displayAuthor = book.editions?.hebrewAuthor || book.author;
+
+        const series = book.editions?.series;
+        const rating = book.editions?.rating;
+        const genres = book.editions?.genres || [];
+        const availability = book.libbyAvailability;
+
+        // Determine availability status
+        let availabilityClass = 'unknown';
+        let availabilityText = 'Availability unknown';
+        let availabilityIcon = '❓';
+
+        if (availability) {
+          if (availability.isAvailable) {
+            availabilityClass = 'available';
+            availabilityIcon = '✓';
+            availabilityText = `Available now on Libby`;
+            if (availability.format) {
+              availabilityText += ` - ${availability.format.charAt(0).toUpperCase() + availability.format.slice(1)}`;
+            }
+          } else {
+            availabilityClass = 'unavailable';
+            availabilityIcon = '✕';
+            availabilityText = 'Not currently available on Libby';
+          }
+        }
+
+        // Generate star rating display
+        const stars = rating ? '★'.repeat(Math.round(rating.average)) + '☆'.repeat(5 - Math.round(rating.average)) : '';
+
+        div.innerHTML = `
+          <div class="book-header">
+            <a href="${book.storygraphUrl}" target="_blank" class="book-title">
+              ${escapeHtml(displayTitle)}
+            </a>
+          </div>
+
+          <div class="book-meta">
+            <span class="book-author">by ${escapeHtml(displayAuthor)}</span>
+            ${series ? ` • <span class="book-series">${escapeHtml(series)}</span>` : ''}
+          </div>
+
+          ${rating || genres.length > 0 ? `
+            <div class="book-stats">
+              ${rating ? `
+                <div class="rating">
+                  <span class="rating-stars">${stars}</span>
+                  <span>${rating.average.toFixed(1)}</span>
+                  <span class="rating-count">(${rating.count.toLocaleString()})</span>
+                </div>
+              ` : ''}
+              ${genres.length > 0 ? `
+                <div class="genres">
+                  ${genres.slice(0, 3).map(genre => `
+                    <span class="genre-tag">${escapeHtml(genre)}</span>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+
+          <div class="availability-badge ${availabilityClass}">
+            <span>${availabilityIcon}</span>
+            <span>${availabilityText}</span>
+          </div>
+
+          <div class="book-links">
+            ${availability?.url ? `
+              <a href="${availability.url}" target="_blank" class="book-link">
+                Search on Libby
+              </a>
+            ` : ''}
+            <a href="${book.storygraphUrl}" target="_blank" class="book-link secondary">
+              View on Storygraph
+            </a>
+          </div>
+        `;
+      }
+
+      return div;
     }
 
     function escapeHtml(text) {

@@ -10,6 +10,7 @@ import type {
   BookEditions,
   GoogleBooksResponse,
   GoogleBooksItem,
+  GoogleBooksVolumeInfo,
 } from '../types/index.js';
 
 export class GoogleBooksService {
@@ -23,15 +24,14 @@ export class GoogleBooksService {
   /**
    * Find Hebrew and English editions of a book
    * @param title - Book title
-   * @param author - Book author (optional)
+   * @param _author - Book author (not used for search to avoid series confusion)
    * @returns Book editions with titles and ISBNs
    */
-  async findEditions(title: string, author: string): Promise<BookEditions> {
+  async findEditions(title: string, _author: string): Promise<BookEditions> {
     try {
-      // Search for the book
-      const searchQuery = author ? `${title} ${author}` : title;
+      // Search for the book by title only (author from Storygraph may contain series info)
       const params: Record<string, string | number> = {
-        q: searchQuery,
+        q: title, // Search by title only for better matches
         maxResults: 5,
         printType: 'books',
         langRestrict: '', // Don't restrict by language initially
@@ -86,12 +86,24 @@ export class GoogleBooksService {
       englishTitle: null,
       hebrewTitle: null,
       isbns: [],
+      hebrewAuthor: null,
+      series: null,
+      genres: [],
+      rating: null,
     };
+
+    let primaryItem: GoogleBooksItem | null = null;
+    const genreSet = new Set<string>();
 
     for (const item of items) {
       const volumeInfo = item.volumeInfo;
       const language = volumeInfo.language;
-      const bookTitle = volumeInfo.title;
+      const bookTitle = this.cleanTitle(volumeInfo.title);
+
+      // Track the first/primary item for series, rating, and genre extraction
+      if (!primaryItem) {
+        primaryItem = item;
+      }
 
       // Collect ISBNs
       if (volumeInfo.industryIdentifiers) {
@@ -104,10 +116,20 @@ export class GoogleBooksService {
         }
       }
 
+      // Collect genres/categories from all items
+      if (volumeInfo.categories) {
+        for (const category of volumeInfo.categories) {
+          genreSet.add(category);
+        }
+      }
+
       // Categorize by language
       if (language === 'he' || language === 'iw') {
         if (!editions.hebrewTitle) {
           editions.hebrewTitle = bookTitle;
+        }
+        if (!editions.hebrewAuthor && volumeInfo.authors?.[0]) {
+          editions.hebrewAuthor = volumeInfo.authors[0];
         }
       } else if (language === 'en') {
         if (!editions.englishTitle) {
@@ -115,6 +137,25 @@ export class GoogleBooksService {
         }
       }
     }
+
+    // Extract series information from primary item
+    if (primaryItem) {
+      editions.series = this.extractSeries(primaryItem.volumeInfo);
+
+      // Extract rating from primary item
+      if (
+        primaryItem.volumeInfo.averageRating &&
+        primaryItem.volumeInfo.ratingsCount
+      ) {
+        editions.rating = {
+          average: primaryItem.volumeInfo.averageRating,
+          count: primaryItem.volumeInfo.ratingsCount,
+        };
+      }
+    }
+
+    // Convert genre set to array
+    editions.genres = Array.from(genreSet);
 
     // If we still don't have both editions, use the original title
     // and detect language from characters
@@ -126,7 +167,7 @@ export class GoogleBooksService {
       // We have Hebrew, assume original is Hebrew if it has Hebrew chars
       const hasHebrew = /[\u0590-\u05FF]/.test(originalTitle);
       if (!hasHebrew) {
-        editions.englishTitle = originalTitle;
+        editions.englishTitle = this.cleanTitle(originalTitle);
       }
     } else if (!editions.hebrewTitle) {
       // We have English, assume original is English unless it has Hebrew chars
@@ -152,6 +193,64 @@ export class GoogleBooksService {
       englishTitle: hasHebrew ? null : title,
       hebrewTitle: hasHebrew ? title : null,
       isbns: [],
+      hebrewAuthor: null,
+      series: null,
+      genres: [],
+      rating: null,
     };
+  }
+
+  /**
+   * Clean title by removing edition markers and parentheticals
+   * @param title - Raw book title
+   * @returns Cleaned title
+   */
+  private cleanTitle(title: string): string {
+    // Remove common edition markers
+    return title
+      .replace(/\s*\((Paperback|Hardcover|Kindle Edition|ebook|audiobook)\)/gi, '')
+      .replace(/\s*\[.*?\]/g, '') // Remove bracketed text
+      .trim();
+  }
+
+  /**
+   * Extract series information from volume info
+   * @param volumeInfo - Google Books volume info
+   * @returns Series string (e.g., "Revelation Space #1") or null
+   */
+  private extractSeries(volumeInfo: GoogleBooksVolumeInfo): string | null {
+    // Check subtitle for series info (e.g., "Book 1 of Revelation Space")
+    if (volumeInfo.subtitle) {
+      const subtitle = volumeInfo.subtitle;
+
+      // Pattern: "Book N of Series Name" or "Series Name, Book N"
+      const bookOfPattern = /(?:Book|Volume|Vol\.?)\s+(\d+)\s+of\s+(.+)/i;
+      const match = subtitle.match(bookOfPattern);
+      if (match && match[1] && match[2]) {
+        return `${match[2].trim()} #${match[1]}`;
+      }
+
+      // Pattern: "Series Name #N" or "Series Name, Book N"
+      const hashPattern = /(.+?)\s*[#,]\s*(?:Book|Volume|Vol\.?)?\s*(\d+)/i;
+      const hashMatch = subtitle.match(hashPattern);
+      if (hashMatch && hashMatch[1] && hashMatch[2]) {
+        return `${hashMatch[1].trim()} #${hashMatch[2]}`;
+      }
+
+      // If subtitle looks like just a series name (single word or title-cased)
+      // and doesn't look like a description, return it
+      if (subtitle.split(' ').length <= 4 && /^[A-Z]/.test(subtitle)) {
+        return subtitle;
+      }
+    }
+
+    // Check title itself for series markers (sometimes included in title)
+    const titleSeriesPattern = /(.+?)\s+\((?:Book|Volume|Vol\.?)\s+(\d+)\)/i;
+    const titleMatch = volumeInfo.title.match(titleSeriesPattern);
+    if (titleMatch && titleMatch[1] && titleMatch[2]) {
+      return `${titleMatch[1].trim()} #${titleMatch[2]}`;
+    }
+
+    return null;
   }
 }

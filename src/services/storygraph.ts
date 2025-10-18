@@ -212,9 +212,18 @@ export class StorygraphService {
 
           const title = titleLink.textContent?.trim() ?? '';
           const authorParagraph = heading.querySelector('p');
-          const author = authorParagraph
+          let author = authorParagraph
             ? (authorParagraph.textContent?.trim() ?? '')
             : '';
+
+          // Clean up author field - remove series info if it's in the format "Series #N"
+          // Common patterns: "Series Name #1", "Series Name #1-3", etc.
+          // If author field is ONLY series info (matches #N pattern), clear it
+          if (/^[^#]+#\d+/.test(author) && !author.includes(' with ') && !author.includes(',')) {
+            // This looks like just series info, not author
+            // We'll extract series info in Google Books instead
+            author = '';
+          }
 
           results.push({
             title,

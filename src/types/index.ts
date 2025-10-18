@@ -12,12 +12,33 @@ export interface Book {
 }
 
 /**
+ * Book rating information
+ */
+export interface BookRating {
+  average: number;
+  count: number;
+}
+
+/**
+ * Libby availability status
+ */
+export interface LibbyAvailability {
+  isAvailable: boolean;
+  format: string | null; // 'ebook', 'audiobook', etc.
+  url: string;
+}
+
+/**
  * Book editions with language variants
  */
 export interface BookEditions {
   englishTitle: string | null;
   hebrewTitle: string | null;
   isbns: string[];
+  hebrewAuthor: string | null;
+  series: string | null;
+  genres: string[];
+  rating: BookRating | null;
 }
 
 /**
@@ -34,6 +55,7 @@ export interface LibbyLinks {
 export interface EnrichedBook extends Book {
   editions: BookEditions;
   libbyLinks: LibbyLinks;
+  libbyAvailability: LibbyAvailability | null;
   error?: string;
 }
 
@@ -82,6 +104,7 @@ export interface IndustryIdentifier {
  */
 export interface GoogleBooksVolumeInfo {
   title: string;
+  subtitle?: string;
   authors?: string[];
   publisher?: string;
   publishedDate?: string;
