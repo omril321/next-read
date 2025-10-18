@@ -22,6 +22,11 @@ function getCacheKey(bookInfo: BookInfo): string {
 export async function getCachedBookData(
   bookInfo: BookInfo
 ): Promise<GoogleBooksData | null> {
+  // Check if extension context is still valid
+  if (!chrome?.runtime?.id) {
+    return null;
+  }
+
   const key = getCacheKey(bookInfo);
 
   try {
@@ -43,6 +48,12 @@ export async function getCachedBookData(
     logger.debug(`Cache hit for: ${bookInfo.title}`);
     return entry.data;
   } catch (error) {
+    // Silently handle extension context errors
+    if (error instanceof Error &&
+        (error.message.includes('Extension context invalidated') ||
+         error.message.includes('Cannot read properties of undefined'))) {
+      return null;
+    }
     logger.error('Error reading from cache:', error);
     return null;
   }
@@ -57,6 +68,11 @@ export async function setCachedBookData(
   bookInfo: BookInfo,
   data: GoogleBooksData
 ): Promise<void> {
+  // Check if extension context is still valid
+  if (!chrome?.runtime?.id) {
+    return;
+  }
+
   const key = getCacheKey(bookInfo);
   const entry: CacheEntry = {
     data,
@@ -67,6 +83,12 @@ export async function setCachedBookData(
     await chrome.storage.local.set({ [key]: entry });
     logger.debug(`Cached data for: ${bookInfo.title}`);
   } catch (error) {
+    // Silently handle extension context errors
+    if (error instanceof Error &&
+        (error.message.includes('Extension context invalidated') ||
+         error.message.includes('Cannot read properties of undefined'))) {
+      return;
+    }
     logger.error('Error writing to cache:', error);
   }
 }

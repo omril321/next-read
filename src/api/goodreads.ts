@@ -23,11 +23,26 @@ export async function fetchGoodreadsData(
 
     // Scraping Goodreads (log removed to reduce console spam)
 
+    // Check if extension context is still valid
+    if (!chrome?.runtime?.id) {
+      // Extension was reloaded - silently skip this request
+      return null;
+    }
+
     // Request HTML from background script (bypasses CORS)
-    const response = await chrome.runtime.sendMessage({
-      type: 'FETCH_GOODREADS',
-      url: searchUrl.toString(),
-    });
+    let response;
+    try {
+      response = await chrome.runtime.sendMessage({
+        type: 'FETCH_GOODREADS',
+        url: searchUrl.toString(),
+      });
+    } catch (error) {
+      // Handle extension context invalidated error (extension was reloaded)
+      if (error instanceof Error && error.message.includes('Extension context invalidated')) {
+        return null;
+      }
+      throw error;
+    }
 
     if (!response.success) {
       logger.error(`Goodreads fetch error: ${response.error}`);
@@ -83,6 +98,16 @@ export async function fetchGoodreadsData(
 
     return null;
   } catch (error) {
+    // Silently handle extension context errors (happens when extension is reloaded)
+    if (error instanceof Error) {
+      if (
+        error.message.includes('Extension context invalidated') ||
+        error.message.includes('Cannot read properties of undefined')
+      ) {
+        // Extension was reloaded - user needs to refresh page, but don't spam console
+        return null;
+      }
+    }
     logger.error('Error scraping Goodreads:', error);
     return null;
   }

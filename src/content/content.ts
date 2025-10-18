@@ -171,14 +171,12 @@ function createLoadingIndicator(): HTMLElement {
 
 /**
  * Creates metadata display element from book data
+ * Returns a clickable link to Goodreads with rating and genre information
  */
 function createMetadataElement(
   data: BookMetadata,
   bookInfo: BookInfo
 ): HTMLElement {
-  const div = document.createElement('div');
-  div.className = 'nextread-metadata';
-
   const parts: string[] = [];
 
   // Add rating if available
@@ -201,23 +199,20 @@ function createMetadataElement(
     parts.push(`<span class="nextread-genres">${genres}</span>`);
   }
 
-  // Add review links
-  const googleBooksUrl = `https://www.google.com/search?tbm=bks&q=${encodeURIComponent(
-    bookInfo.title + (bookInfo.author ? ' ' + bookInfo.author : '')
-  )}`;
+  // Create Goodreads link that wraps all content
   const goodreadsUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(
     bookInfo.title + (bookInfo.author ? ' ' + bookInfo.author : '')
   )}`;
 
-  parts.push(
-    `<span class="nextread-links">` +
-      `<a href="${googleBooksUrl}" target="_blank" rel="noopener" class="nextread-link" title="View on Google Books">📖</a>` +
-      ` <a href="${goodreadsUrl}" target="_blank" rel="noopener" class="nextread-link" title="View on Goodreads">📚</a>` +
-      `</span>`
-  );
+  const link = document.createElement('a');
+  link.href = goodreadsUrl;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.className = 'nextread-metadata';
+  link.title = 'Open in Goodreads';
+  link.innerHTML = parts.join(' ');
 
-  div.innerHTML = parts.join(' ');
-  return div;
+  return link;
 }
 
 /**
@@ -231,23 +226,66 @@ function formatCount(count: number): string {
 }
 
 /**
- * Inserts metadata element below the card's title
+ * Finds the .title-tile-facts element
+ */
+function findTitleTileFacts(card: HTMLAnchorElement): HTMLElement | null {
+  // The card link is inside a heading
+  const heading = card.parentElement;
+  if (!heading) return null;
+
+  // Look for .title-tile-facts in the parent container
+  const parent = heading.parentElement;
+  if (!parent) return null;
+
+  // Search for element with class title-tile-facts
+  const titleTileFacts = parent.querySelector('.title-tile-facts');
+  return titleTileFacts as HTMLElement | null;
+}
+
+/**
+ * Inserts metadata element inside .title-tile-facts as last child
  */
 function insertMetadata(
   card: HTMLAnchorElement,
   metadataEl: HTMLElement
 ): void {
-  // Try to insert after the card or within it
-  // Libby's structure may vary, so we'll append to the card itself
-  card.appendChild(metadataEl);
+  // Find the .title-tile-facts element
+  const titleTileFacts = findTitleTileFacts(card);
+
+  if (titleTileFacts) {
+    // Append metadata as last child
+    titleTileFacts.appendChild(metadataEl);
+    logger.debug('Inserted metadata inside .title-tile-facts');
+  } else {
+    // Fallback: append after the heading
+    const heading = card.parentElement;
+    if (heading && heading.parentElement) {
+      heading.parentElement.insertBefore(
+        metadataEl,
+        heading.nextElementSibling
+      );
+      logger.debug('Inserted metadata after heading (fallback)');
+    } else {
+      card.appendChild(metadataEl);
+      logger.debug('Inserted metadata into card (final fallback)');
+    }
+  }
 }
 
 /**
- * Removes any existing metadata elements from the card
+ * Removes any existing metadata elements associated with this card
  */
 function removeMetadata(card: HTMLAnchorElement): void {
-  const existing = card.querySelectorAll('.nextread-metadata');
-  existing.forEach((el) => el.remove());
+  // Search in the card itself
+  const inCard = card.querySelectorAll('.nextread-metadata');
+  inCard.forEach((el) => el.remove());
+
+  // Also search in the parent container (where we might have inserted it)
+  const parent = card.parentElement?.parentElement;
+  if (parent) {
+    const inParent = parent.querySelectorAll('.nextread-metadata');
+    inParent.forEach((el) => el.remove());
+  }
 }
 
 /**
