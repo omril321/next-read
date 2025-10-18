@@ -38,7 +38,10 @@ export async function fetchGoodreadsData(
       });
     } catch (error) {
       // Handle extension context invalidated error (extension was reloaded)
-      if (error instanceof Error && error.message.includes('Extension context invalidated')) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Extension context invalidated')
+      ) {
         return null;
       }
       throw error;

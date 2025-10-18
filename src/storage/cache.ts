@@ -49,9 +49,11 @@ export async function getCachedBookData(
     return entry.data;
   } catch (error) {
     // Silently handle extension context errors
-    if (error instanceof Error &&
-        (error.message.includes('Extension context invalidated') ||
-         error.message.includes('Cannot read properties of undefined'))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('Extension context invalidated') ||
+        error.message.includes('Cannot read properties of undefined'))
+    ) {
       return null;
     }
     logger.error('Error reading from cache:', error);
@@ -84,9 +86,11 @@ export async function setCachedBookData(
     logger.debug(`Cached data for: ${bookInfo.title}`);
   } catch (error) {
     // Silently handle extension context errors
-    if (error instanceof Error &&
-        (error.message.includes('Extension context invalidated') ||
-         error.message.includes('Cannot read properties of undefined'))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('Extension context invalidated') ||
+        error.message.includes('Cannot read properties of undefined'))
+    ) {
       return;
     }
     logger.error('Error writing to cache:', error);

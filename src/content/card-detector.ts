@@ -15,7 +15,11 @@ export function findUnprocessedCards(): HTMLAnchorElement[] {
   const coverImageLinks = Array.from(document.querySelectorAll('a'));
 
   for (const link of coverImageLinks) {
-    if (link.hasAttribute(PROCESSED_ATTRIBUTE)) {
+    // Skip cards that are already processed or currently loading
+    if (
+      link.hasAttribute(PROCESSED_ATTRIBUTE) ||
+      link.hasAttribute(LOADING_ATTRIBUTE)
+    ) {
       continue;
     }
 
@@ -45,7 +49,12 @@ export function findUnprocessedCards(): HTMLAnchorElement[] {
     ) {
       // Find the link within this heading
       const link = heading.querySelector('a');
-      if (link && !link.hasAttribute(PROCESSED_ATTRIBUTE)) {
+      // Skip cards that are already processed or currently loading
+      if (
+        link &&
+        !link.hasAttribute(PROCESSED_ATTRIBUTE) &&
+        !link.hasAttribute(LOADING_ATTRIBUTE)
+      ) {
         bookCards.push(link as HTMLAnchorElement);
       }
     }
