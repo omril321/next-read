@@ -8,33 +8,13 @@ import {
 import { fetchGoodreadsData } from '../api/goodreads';
 import { getCachedBookData, setCachedBookData } from '../storage/cache';
 import { logger } from '../utils/logger';
+import {
+  enqueue,
+  observeCard,
+  unobserveCard,
+  startBatch,
+} from './request-manager';
 import type { GoogleBooksData, BookInfo, BookMetadata } from '../types';
-
-// Queue for API requests to avoid rate limiting
-let apiRequestQueue: Array<() => Promise<void>> = [];
-let isProcessingQueue = false;
-
-/**
- * Processes the API request queue with delays between requests
- */
-async function processQueue() {
-  if (isProcessingQueue || apiRequestQueue.length === 0) {
-    return;
-  }
-
-  isProcessingQueue = true;
-
-  while (apiRequestQueue.length > 0) {
-    const request = apiRequestQueue.shift();
-    if (request) {
-      await request();
-      // Wait 500ms between requests to avoid detection (Goodreads scraping)
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  }
-
-  isProcessingQueue = false;
-}
 
 /**
  * Fetches book metadata from Goodreads only
@@ -81,8 +61,9 @@ async function processCard(card: HTMLAnchorElement): Promise<void> {
     return;
   }
 
-  // Mark as loading
+  // Mark as loading and observe for visibility prioritization
   markCardAsLoading(card);
+  observeCard(card);
 
   // Add loading indicator
   const loadingEl = createLoadingIndicator();
@@ -93,6 +74,7 @@ async function processCard(card: HTMLAnchorElement): Promise<void> {
 
   if (cachedData) {
     // Use cached data immediately (convert to BookMetadata format)
+    unobserveCard(card);
     removeMetadata(card);
     unmarkCardAsLoading(card);
     const bookMetadata: BookMetadata = {
@@ -115,48 +97,49 @@ async function processCard(card: HTMLAnchorElement): Promise<void> {
     return;
   }
 
-  // Not in cache - add to API queue
-  const fetchRequest = async () => {
-    try {
-      const bookData = await fetchBookMetadata(bookInfo);
+  // Not in cache - enqueue for parallel processing
+  enqueue({
+    card,
+    execute: async () => {
+      try {
+        const bookData = await fetchBookMetadata(bookInfo);
 
-      // Cache the result (convert BookMetadata back to GoogleBooksData for cache compatibility)
-      if (bookData) {
-        const cacheData: GoogleBooksData = {};
+        // Cache the result (convert BookMetadata back to GoogleBooksData for cache compatibility)
+        if (bookData) {
+          const cacheData: GoogleBooksData = {};
 
-        if (bookData.averageRating !== undefined) {
-          cacheData.averageRating = bookData.averageRating;
-        }
-        if (bookData.ratingsCount !== undefined) {
-          cacheData.ratingsCount = bookData.ratingsCount;
-        }
-        if (bookData.categories !== undefined) {
-          cacheData.categories = bookData.categories;
+          if (bookData.averageRating !== undefined) {
+            cacheData.averageRating = bookData.averageRating;
+          }
+          if (bookData.ratingsCount !== undefined) {
+            cacheData.ratingsCount = bookData.ratingsCount;
+          }
+          if (bookData.categories !== undefined) {
+            cacheData.categories = bookData.categories;
+          }
+
+          await setCachedBookData(bookInfo, cacheData);
         }
 
-        await setCachedBookData(bookInfo, cacheData);
+        // Remove loading indicator
+        removeMetadata(card);
+        unmarkCardAsLoading(card);
+
+        // Display the data if available
+        if (bookData) {
+          const metadataEl = createMetadataElement(bookData, bookInfo);
+          insertMetadata(card, metadataEl);
+        }
+      } catch (error) {
+        logger.error('Error processing card:', error);
+        removeMetadata(card);
+        unmarkCardAsLoading(card);
+      } finally {
+        unobserveCard(card);
+        markCardAsProcessed(card);
       }
-
-      // Remove loading indicator
-      removeMetadata(card);
-      unmarkCardAsLoading(card);
-
-      // Display the data if available
-      if (bookData) {
-        const metadataEl = createMetadataElement(bookData, bookInfo);
-        insertMetadata(card, metadataEl);
-      }
-    } catch (error) {
-      logger.error('Error processing card:', error);
-      removeMetadata(card);
-      unmarkCardAsLoading(card);
-    } finally {
-      markCardAsProcessed(card);
-    }
-  };
-
-  apiRequestQueue.push(fetchRequest);
-  processQueue();
+    },
+  });
 }
 
 /**
@@ -301,6 +284,9 @@ function processAllCards(): void {
       // Process each card (async, but we don't await)
       processCard(card);
     });
+
+    // Start parallel batch processing
+    startBatch();
   }
 }
 
