@@ -92,3 +92,21 @@
 a[data-nextread-loading] {
   opacity: 0.8;
 }
+
+/* Interest level: Low - reduced opacity for uninteresting books */
+[data-nextread-interest="low"] {
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+/* Restore opacity on hover for readability */
+[data-nextread-interest="low"]:hover {
+  opacity: 1;
+}
+
+/* Interest level: High - gold glow for highly-rated books */
+[data-nextread-interest="high"] {
+  box-shadow: 0 0 20px 6px rgba(255, 193, 7, 0.7);
+  border-radius: 8px;
+  transition: box-shadow 0.3s ease;
+}

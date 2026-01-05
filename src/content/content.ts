@@ -16,6 +16,47 @@ import {
 } from './request-manager';
 import type { GoogleBooksData, BookInfo, BookMetadata } from '../types';
 
+type InterestLevel = 'low' | 'high' | 'normal';
+
+/**
+ * Determines the interest level of a book based on ratings and review count
+ */
+function getInterestLevel(data: BookMetadata | null): InterestLevel {
+  // No data = low interest
+  if (!data || !data.ratingsCount || !data.averageRating) {
+    return 'low';
+  }
+
+  if (data.ratingsCount < 10 || data.averageRating < 3.4) {
+    return 'low';
+  }
+
+  if (
+    (data.ratingsCount >= 15000 && data.averageRating >= 4) ||
+    (data.ratingsCount >= 1000 && data.averageRating >= 4.2) ||
+    (data.ratingsCount >= 50 && data.averageRating >= 4.5)
+  ) {
+    return 'high';
+  }
+
+  return 'normal';
+}
+
+/**
+ * Applies visual interest level styling to the book card container
+ */
+function applyInterestLevel(
+  card: HTMLAnchorElement,
+  level: InterestLevel
+): void {
+  // Find the title-tile container (parent of heading)
+  const container =
+    card.closest('.title-tile') || card.parentElement?.parentElement;
+  if (container) {
+    container.setAttribute('data-nextread-interest', level);
+  }
+}
+
 /**
  * Fetches book metadata from Goodreads only
  * Scrapes public Goodreads search pages for personal use
@@ -93,6 +134,7 @@ async function processCard(card: HTMLAnchorElement): Promise<void> {
 
     const metadataEl = createMetadataElement(bookMetadata, bookInfo);
     insertMetadata(card, metadataEl);
+    applyInterestLevel(card, getInterestLevel(bookMetadata));
     markCardAsProcessed(card);
     return;
   }
@@ -125,10 +167,14 @@ async function processCard(card: HTMLAnchorElement): Promise<void> {
         removeMetadata(card);
         unmarkCardAsLoading(card);
 
-        // Display the data if available
+        // Display the data if available and apply interest level
         if (bookData) {
           const metadataEl = createMetadataElement(bookData, bookInfo);
           insertMetadata(card, metadataEl);
+          applyInterestLevel(card, getInterestLevel(bookData));
+        } else {
+          // No data = low interest
+          applyInterestLevel(card, 'low');
         }
       } catch (error) {
         logger.error('Error processing card:', error);
